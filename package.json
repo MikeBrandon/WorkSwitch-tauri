@@ -1,0 +1,10 @@
+{
+  "name": "workswitch",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "tauri": "cargo tauri",
+    "dev": "cargo tauri dev",
+    "build": "cargo tauri build"
+  }
+}
