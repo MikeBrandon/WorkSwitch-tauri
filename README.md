@@ -1,6 +1,7 @@
 # WorkSwitch
 
 A desktop app for managing profiles of apps and steps that launch together. Switch between work setups, gaming rigs, or dev environments with one click.
+[Buy Me A Ko-Fi] (https://ko-fi.com/mikebrandon)
 
 Built with [Tauri v2](https://v2.tauri.app/) (Rust backend + vanilla JS frontend).
 
