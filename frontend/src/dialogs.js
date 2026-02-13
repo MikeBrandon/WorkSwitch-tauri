@@ -32,6 +32,13 @@ export function showConfirm(title, message) {
 // ── Profile editor ──
 export function showProfileEditor(profile, isNew) {
   return new Promise((resolve) => {
+    const tags = (profile.tags || []).join(', ');
+    const schedule = profile.schedule || { enabled: false, time: '09:00', days: [] };
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayChecks = dayNames.map((d, i) =>
+      `<label class="day-check"><input type="checkbox" class="pe-day" value="${i}" ${schedule.days && schedule.days.includes(i) ? 'checked' : ''}>${d}</label>`
+    ).join('');
+
     showModal(`
       <div class="modal-title">${isNew ? 'New Profile' : 'Edit Profile'}</div>
       <div class="form-group">
@@ -42,17 +49,72 @@ export function showProfileEditor(profile, isNew) {
         <label>Description</label>
         <input type="text" id="pe-desc" value="${escapeAttr(profile.description || '')}" placeholder="Optional description">
       </div>
+      <div class="form-group">
+        <label>Tags (comma separated)</label>
+        <input type="text" id="pe-tags" value="${escapeAttr(tags)}" placeholder="Work, Dev, Gaming">
+      </div>
+      <div class="form-group">
+        <label>Hotkey (e.g. Ctrl+Shift+1)</label>
+        <input type="text" id="pe-hotkey" value="${escapeAttr(profile.hotkey || '')}" placeholder="Click and press keys..." readonly>
+      </div>
+      <div class="settings-section" style="margin-top:12px">
+        <h3>Schedule</h3>
+        <div class="form-check">
+          <input type="checkbox" id="pe-sched-enabled" ${schedule.enabled ? 'checked' : ''}>
+          <label for="pe-sched-enabled">Auto-launch on schedule</label>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Time</label>
+            <input type="time" id="pe-sched-time" value="${escapeAttr(schedule.time || '09:00')}">
+          </div>
+          <div class="form-group">
+            <label>Days</label>
+            <div class="day-checks">${dayChecks}</div>
+          </div>
+        </div>
+      </div>
       <div class="modal-actions">
         <button class="btn-secondary" id="pe-cancel">Cancel</button>
         <button class="btn-primary" id="pe-save">Save</button>
       </div>
     `);
 
+    // Hotkey capture
+    const hotkeyInput = document.getElementById('pe-hotkey');
+    hotkeyInput.addEventListener('keydown', (e) => {
+      e.preventDefault();
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.metaKey) parts.push('Super');
+      const key = e.key;
+      if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
+        parts.push(key.length === 1 ? key.toUpperCase() : key);
+      }
+      if (parts.length > 0) hotkeyInput.value = parts.join('+');
+    });
+    hotkeyInput.addEventListener('click', () => hotkeyInput.value = '');
+
     document.getElementById('pe-name').focus();
     document.getElementById('pe-cancel').addEventListener('click', () => { hideModal(); resolve(null); });
     document.getElementById('pe-save').addEventListener('click', () => {
       profile.name = document.getElementById('pe-name').value.trim() || 'Unnamed';
       profile.description = document.getElementById('pe-desc').value.trim();
+      profile.tags = document.getElementById('pe-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+      profile.hotkey = document.getElementById('pe-hotkey').value.trim();
+
+      const schedEnabled = document.getElementById('pe-sched-enabled').checked;
+      const schedTime = document.getElementById('pe-sched-time').value || '09:00';
+      const schedDays = [...document.querySelectorAll('.pe-day:checked')].map(cb => parseInt(cb.value));
+
+      if (schedEnabled || schedTime !== '09:00' || schedDays.length > 0) {
+        profile.schedule = { enabled: schedEnabled, time: schedTime, days: schedDays };
+      } else {
+        profile.schedule = null;
+      }
+
       hideModal();
       resolve(profile);
     });
@@ -332,6 +394,45 @@ export function showCloseOnSwitch(processes) {
       hideModal();
       resolve(toClose);
     });
+  });
+}
+
+// ── Launch history dialog ──
+export function showLaunchHistory(history) {
+  return new Promise((resolve) => {
+    let rows = '';
+    if (!history || history.length === 0) {
+      rows = '<div class="process-empty" style="padding:20px 0">No launch history yet.</div>';
+    } else {
+      rows = [...history].reverse().slice(0, 50).map(h => {
+        const date = new Date(h.timestamp);
+        const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const statusIcon = h.success ? '<span style="color:var(--success)">&#10003;</span>' : '<span style="color:var(--danger)">&#10007;</span>';
+        return `
+          <div class="history-item">
+            ${statusIcon}
+            <span class="history-name">${escapeHtml(h.profile_name)}</span>
+            <span class="history-stats">${h.steps_launched} launched${h.steps_failed > 0 ? ', ' + h.steps_failed + ' failed' : ''}</span>
+            <span class="history-date">${escapeHtml(dateStr)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    showModal(`
+      <div class="modal-title">Launch History</div>
+      <div style="max-height:350px;overflow-y:auto">${rows}</div>
+      <div class="modal-actions">
+        ${history && history.length > 0 ? '<button class="btn-secondary" id="hist-clear">Clear History</button>' : ''}
+        <button class="btn-primary" id="hist-close">Close</button>
+      </div>
+    `);
+
+    document.getElementById('hist-close').addEventListener('click', () => { hideModal(); resolve(false); });
+    const clearBtn = document.getElementById('hist-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => { hideModal(); resolve(true); });
+    }
   });
 }
 

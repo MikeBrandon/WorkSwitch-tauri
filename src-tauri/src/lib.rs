@@ -3,6 +3,7 @@ mod config;
 mod discovery;
 mod launcher;
 mod process;
+mod scheduler;
 mod tray;
 
 use commands::LaunchState;
@@ -27,6 +28,12 @@ pub fn run() {
             commands::scan_apps,
             commands::show_window,
             commands::set_auto_start,
+            commands::browse_save_profile,
+            commands::browse_import_profile,
+            commands::export_profile,
+            commands::import_profile,
+            commands::save_profile_file,
+            commands::load_profile_file,
         ])
         .setup(|app| {
             // Create tray icon
@@ -41,6 +48,12 @@ pub fn run() {
                     let _ = window.hide();
                 }
             }
+
+            // Start schedule checker
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                scheduler::run_scheduler(app_handle);
+            });
 
             // Launch startup apps
             if !cfg.startup_apps.is_empty() {

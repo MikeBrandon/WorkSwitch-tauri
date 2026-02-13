@@ -24,6 +24,7 @@
     <div class="toolbar-actions-left">
       <button id="btn-startup" class="toolbar-btn" title="Startup Apps">&#9889;</button>
       <button id="btn-processes" class="toolbar-btn" title="Running Processes">&#9654;</button>
+      <button id="btn-history" class="toolbar-btn" title="Launch History">&#128339;</button>
     </div>
     <div class="toolbar-actions">
       <button id="btn-settings" class="toolbar-btn" title="Settings">&#9881;</button>
@@ -36,7 +37,10 @@
     <div id="sidebar">
       <div id="sidebar-header">
         <span>Profiles</span>
-        <button id="btn-add-profile" class="icon-btn" title="Add profile">+</button>
+        <div style="display:flex;gap:4px">
+          <button id="btn-import-profile" class="icon-btn" title="Import profile">&#8615;</button>
+          <button id="btn-add-profile" class="icon-btn" title="Add profile">+</button>
+        </div>
       </div>
       <div id="profile-list"></div>
     </div>

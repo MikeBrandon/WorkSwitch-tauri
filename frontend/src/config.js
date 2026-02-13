@@ -29,7 +29,10 @@ export function newProfile() {
     id: generateId(),
     name: 'New Profile',
     description: '',
-    steps: []
+    steps: [],
+    tags: [],
+    hotkey: '',
+    schedule: null
   };
 }
 

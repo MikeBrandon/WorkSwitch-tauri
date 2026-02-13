@@ -17,6 +17,7 @@ export function renderSteps() {
   }
 
   list.innerHTML = '';
+
   profile.steps.forEach((step, index) => {
     const card = document.createElement('div');
     card.className = 'step-card' + (step.enabled ? '' : ' disabled');

@@ -1,8 +1,8 @@
 import { loadConfig, getConfig, saveConfig } from './config.js';
-import { renderProfiles, selectProfile, addProfile, getSelectedProfile, getSelectedProfileId } from './profiles.js';
+import { renderProfiles, selectProfile, addProfile, getSelectedProfile, getSelectedProfileId, importProfile } from './profiles.js';
 import { renderSteps, addStep } from './steps.js';
 import { startLaunch, cancelLaunch, isLaunching } from './launcher.js';
-import { showSettings, showCloseOnSwitch } from './dialogs.js';
+import { showSettings, showCloseOnSwitch, showLaunchHistory } from './dialogs.js';
 import { showStartupPanel } from './startup.js';
 import { toggleProcessPanel } from './processes.js';
 
@@ -56,6 +56,15 @@ function wireEvents() {
 
   // Process panel
   document.getElementById('btn-processes').addEventListener('click', toggleProcessPanel);
+
+  // History
+  document.getElementById('btn-history').addEventListener('click', handleHistory);
+
+  // Import profile
+  document.getElementById('btn-import-profile').addEventListener('click', importProfile);
+
+  // Global hotkeys
+  registerHotkeys();
 }
 
 async function handleLaunch() {
@@ -74,7 +83,10 @@ async function handleLaunch() {
     }
 
     _lastLaunchedProfileId = profile.id;
+    const enabledSteps = profile.steps.filter(s => s.enabled);
     await startLaunch(profile.steps, config.settings.launch_delay_ms || 500);
+    // Record in history (count enabled steps as launched; errors handled by launcher events)
+    recordLaunch(profile.id, profile.name, enabledSteps.length, 0);
   } catch (err) {
     console.error('Launch error:', err);
     document.getElementById('status-text').textContent = 'Error: ' + err;
@@ -137,6 +149,60 @@ async function listenTrayEvents() {
       await invoke('show_window');
     } catch (e) {
       console.error('Show window error:', e);
+    }
+  });
+}
+
+async function handleHistory() {
+  const config = getConfig();
+  const cleared = await showLaunchHistory(config.launch_history || []);
+  if (cleared) {
+    config.launch_history = [];
+    await saveConfig(config);
+  }
+}
+
+function recordLaunch(profileId, profileName, stepsLaunched, stepsFailed) {
+  const config = getConfig();
+  if (!config.launch_history) config.launch_history = [];
+  config.launch_history.push({
+    profile_id: profileId,
+    profile_name: profileName,
+    timestamp: new Date().toISOString(),
+    success: stepsFailed === 0,
+    steps_launched: stepsLaunched,
+    steps_failed: stepsFailed
+  });
+  // Keep max 100 entries
+  if (config.launch_history.length > 100) {
+    config.launch_history = config.launch_history.slice(-100);
+  }
+  saveConfig(config);
+}
+
+function registerHotkeys() {
+  document.addEventListener('keydown', (e) => {
+    const parts = [];
+    if (e.ctrlKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.metaKey) parts.push('Super');
+    const key = e.key;
+    if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
+      parts.push(key.length === 1 ? key.toUpperCase() : key);
+    }
+    if (parts.length < 2) return; // Need at least modifier + key
+
+    const combo = parts.join('+');
+    const config = getConfig();
+    if (!config) return;
+
+    const match = config.profiles.find(p => p.hotkey === combo);
+    if (match) {
+      e.preventDefault();
+      selectProfile(match.id);
+      renderProfiles();
+      setTimeout(() => handleLaunch(), 100);
     }
   });
 }

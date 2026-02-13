@@ -1,4 +1,4 @@
-use crate::config::{self, AppConfig, Step};
+use crate::config::{self, AppConfig, Profile, Step};
 use crate::discovery;
 use crate::launcher;
 use crate::process;
@@ -252,6 +252,65 @@ pub fn set_auto_start(enabled: bool) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn browse_save_profile(
+    default_name: String,
+    app: tauri::AppHandle,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let file = app
+        .dialog()
+        .file()
+        .set_file_name(&default_name)
+        .add_filter("JSON", &["json"])
+        .blocking_save_file();
+
+    Ok(file.map(|f| f.to_string()))
+}
+
+#[tauri::command]
+pub async fn browse_import_profile(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let file = app
+        .dialog()
+        .file()
+        .add_filter("JSON", &["json"])
+        .blocking_pick_file();
+
+    Ok(file.map(|f| f.to_string()))
+}
+
+#[tauri::command]
+pub fn export_profile(profile_id: String) -> Result<String, String> {
+    let cfg = config::load_config();
+    let profile = cfg
+        .profiles
+        .iter()
+        .find(|p| p.id == profile_id)
+        .ok_or_else(|| "Profile not found".to_string())?;
+
+    serde_json::to_string_pretty(profile).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_profile(json: String) -> Result<Profile, String> {
+    serde_json::from_str(&json).map_err(|e| format!("Invalid profile JSON: {}", e))
+}
+
+#[tauri::command]
+pub fn save_profile_file(profile_id: String, path: String) -> Result<(), String> {
+    let json = export_profile(profile_id)?;
+    std::fs::write(&path, &json).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+pub fn load_profile_file(path: String) -> Result<Profile, String> {
+    let json = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    import_profile(json)
 }
 
 #[tauri::command]

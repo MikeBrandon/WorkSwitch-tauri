@@ -8,6 +8,18 @@ pub struct AppConfig {
     pub profiles: Vec<Profile>,
     #[serde(default)]
     pub startup_apps: Vec<Step>,
+    #[serde(default)]
+    pub launch_history: Vec<LaunchRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaunchRecord {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub timestamp: String,
+    pub success: bool,
+    pub steps_launched: u32,
+    pub steps_failed: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +45,20 @@ pub struct Profile {
     #[serde(default)]
     pub description: String,
     pub steps: Vec<Step>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub hotkey: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<Schedule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Schedule {
+    pub enabled: bool,
+    pub time: String,
+    #[serde(default)]
+    pub days: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +112,7 @@ impl Default for AppConfig {
             },
             profiles: vec![],
             startup_apps: vec![],
+            launch_history: vec![],
         }
     }
 }

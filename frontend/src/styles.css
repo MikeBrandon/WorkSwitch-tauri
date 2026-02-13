@@ -834,6 +834,118 @@ body {
   opacity: 0.5;
 }
 
+/* === Tags === */
+.tag-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 0;
+  margin-bottom: 4px;
+}
+
+.tag-pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tag-pill.small {
+  font-size: 9px;
+  padding: 1px 6px;
+}
+
+.tag-pill.clickable {
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tag-pill.clickable:hover {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+.tag-pill.active {
+  background: var(--accent);
+  color: white;
+}
+
+.profile-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.profile-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.profile-hotkey {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+/* === History === */
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.history-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.history-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.history-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.history-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* === Day Checks (Schedule) === */
+.day-checks {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.day-check {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.day-check input {
+  width: auto !important;
+}
+
 /* === Process Panel === */
 #process-panel {
   background: var(--bg-secondary);
