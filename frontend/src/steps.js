@@ -1,6 +1,6 @@
 import { getConfig, saveConfig, newStep } from './config.js';
 import { getSelectedProfile, getSelectedProfileId } from './profiles.js';
-import { showStepEditor } from './dialogs.js';
+import { showStepEditor, showDuplicateNamePrompt } from './dialogs.js';
 
 export function renderSteps() {
   const profile = getSelectedProfile();
@@ -33,8 +33,10 @@ export function renderSteps() {
         <div class="step-detail">${escapeHtml(detail)}</div>
       </div>
       <div class="step-actions">
+        ${index > 0 ? '<button class="step-action-btn move-top" title="Move to top">&#9194;</button>' : ''}
         ${index > 0 ? '<button class="step-action-btn move-up" title="Move up">&#9650;</button>' : ''}
         ${index < profile.steps.length - 1 ? '<button class="step-action-btn move-down" title="Move down">&#9660;</button>' : ''}
+        ${index < profile.steps.length - 1 ? '<button class="step-action-btn move-bottom" title="Move to bottom">&#9193;</button>' : ''}
         <button class="step-action-btn edit-step" title="Edit">&#9998;</button>
         <button class="step-action-btn dup-step" title="Duplicate">&#10697;</button>
         <button class="step-action-btn danger del-step" title="Delete">&#10005;</button>
@@ -49,6 +51,12 @@ export function renderSteps() {
       renderSteps();
     });
 
+    // Move to top
+    const topBtn = card.querySelector('.move-top');
+    if (topBtn) {
+      topBtn.addEventListener('click', (e) => { e.stopPropagation(); moveStepToTop(index); });
+    }
+
     // Move up
     const upBtn = card.querySelector('.move-up');
     if (upBtn) {
@@ -59,6 +67,12 @@ export function renderSteps() {
     const downBtn = card.querySelector('.move-down');
     if (downBtn) {
       downBtn.addEventListener('click', (e) => { e.stopPropagation(); moveStep(index, 1); });
+    }
+
+    // Move to bottom
+    const bottomBtn = card.querySelector('.move-bottom');
+    if (bottomBtn) {
+      bottomBtn.addEventListener('click', (e) => { e.stopPropagation(); moveStepToBottom(index); });
     }
 
     // Edit
@@ -106,6 +120,26 @@ async function moveStep(index, direction) {
   renderSteps();
 }
 
+async function moveStepToTop(index) {
+  const profile = getSelectedProfile();
+  if (!profile || index <= 0) return;
+
+  const [step] = profile.steps.splice(index, 1);
+  profile.steps.unshift(step);
+  await saveConfig();
+  renderSteps();
+}
+
+async function moveStepToBottom(index) {
+  const profile = getSelectedProfile();
+  if (!profile || index >= profile.steps.length - 1) return;
+
+  const [step] = profile.steps.splice(index, 1);
+  profile.steps.push(step);
+  await saveConfig();
+  renderSteps();
+}
+
 export async function addStep() {
   const profile = getSelectedProfile();
   if (!profile) return;
@@ -138,8 +172,12 @@ async function duplicateStep(step) {
   const profile = getSelectedProfile();
   if (!profile) return;
 
+  const defaultName = step.name + ' (copy)';
+  const name = await showDuplicateNamePrompt(defaultName);
+  if (name === null) return;
+
   const { generateId } = await import('./config.js');
-  const dup = { ...step, id: generateId(), name: step.name + ' (copy)' };
+  const dup = { ...step, id: generateId(), name };
   profile.steps.push(dup);
   await saveConfig();
   renderSteps();

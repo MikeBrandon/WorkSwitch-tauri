@@ -3,6 +3,8 @@ import { renderProfiles, selectProfile, addProfile, getSelectedProfile, getSelec
 import { renderSteps, addStep } from './steps.js';
 import { startLaunch, cancelLaunch, isLaunching } from './launcher.js';
 import { showSettings, showCloseOnSwitch } from './dialogs.js';
+import { showStartupPanel } from './startup.js';
+import { toggleProcessPanel } from './processes.js';
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -28,6 +30,12 @@ async function init() {
 }
 
 function wireEvents() {
+  // Custom titlebar
+  const appWindow = getCurrentWindow();
+  document.getElementById('titlebar-minimize').addEventListener('click', () => appWindow.minimize());
+  document.getElementById('titlebar-maximize').addEventListener('click', () => appWindow.toggleMaximize());
+  document.getElementById('titlebar-close').addEventListener('click', () => appWindow.close());
+
   // Add profile
   document.getElementById('btn-add-profile').addEventListener('click', addProfile);
 
@@ -43,7 +51,11 @@ function wireEvents() {
   // Settings
   document.getElementById('btn-settings').addEventListener('click', handleSettings);
 
-  // Close via window manager - intercept is handled by Rust backend
+  // Startup apps
+  document.getElementById('btn-startup').addEventListener('click', showStartupPanel);
+
+  // Process panel
+  document.getElementById('btn-processes').addEventListener('click', toggleProcessPanel);
 }
 
 async function handleLaunch() {

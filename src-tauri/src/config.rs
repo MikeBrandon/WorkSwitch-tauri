@@ -6,6 +6,8 @@ use std::path::PathBuf;
 pub struct AppConfig {
     pub settings: Settings,
     pub profiles: Vec<Profile>,
+    #[serde(default)]
+    pub startup_apps: Vec<Step>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +22,8 @@ pub struct Settings {
     pub close_on_switch: bool,
     #[serde(default = "default_true")]
     pub minimize_to_tray: bool,
+    #[serde(default)]
+    pub auto_start_with_windows: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,8 +82,10 @@ impl Default for AppConfig {
                 start_minimized: false,
                 close_on_switch: true,
                 minimize_to_tray: true,
+                auto_start_with_windows: false,
             },
             profiles: vec![],
+            startup_apps: vec![],
         }
     }
 }

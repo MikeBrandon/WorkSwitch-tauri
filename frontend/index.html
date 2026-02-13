@@ -7,9 +7,24 @@
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
+  <!-- Custom Titlebar -->
+  <div id="titlebar">
+    <div id="titlebar-drag">
+      <span id="titlebar-title">WorkSwitch</span>
+    </div>
+    <div id="titlebar-controls">
+      <button id="titlebar-minimize" class="titlebar-btn" title="Minimize">&#x2015;</button>
+      <button id="titlebar-maximize" class="titlebar-btn" title="Maximize">&#9723;</button>
+      <button id="titlebar-close" class="titlebar-btn titlebar-close" title="Close">&#10005;</button>
+    </div>
+  </div>
+
   <!-- Toolbar -->
   <div id="toolbar">
-    <span class="toolbar-title">WorkSwitch</span>
+    <div class="toolbar-actions-left">
+      <button id="btn-startup" class="toolbar-btn" title="Startup Apps">&#9889;</button>
+      <button id="btn-processes" class="toolbar-btn" title="Running Processes">&#9654;</button>
+    </div>
     <div class="toolbar-actions">
       <button id="btn-settings" class="toolbar-btn" title="Settings">&#9881;</button>
     </div>
@@ -39,6 +54,18 @@
     </div>
   </div>
 
+  <!-- Process Panel (collapsible) -->
+  <div id="process-panel" class="collapsed">
+    <div id="process-panel-header">
+      <span>Running Processes</span>
+      <div id="process-panel-actions">
+        <button id="btn-end-all" class="secondary-btn" style="font-size:11px;padding:3px 10px">End All</button>
+        <button id="btn-collapse-processes" class="step-action-btn" title="Collapse">&#9660;</button>
+      </div>
+    </div>
+    <div id="process-list"></div>
+  </div>
+
   <!-- Status bar -->
   <div id="statusbar">
     <div id="launch-section">
@@ -56,6 +83,8 @@
     <div id="modal-content"></div>
   </div>
 
+  <script type="module" src="src/startup.js"></script>
+  <script type="module" src="src/processes.js"></script>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

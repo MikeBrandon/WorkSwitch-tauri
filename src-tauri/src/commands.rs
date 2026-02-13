@@ -1,4 +1,5 @@
 use crate::config::{self, AppConfig, Step};
+use crate::discovery;
 use crate::launcher;
 use crate::process;
 use crate::tray;
@@ -214,6 +215,43 @@ pub async fn browse_folder(app: tauri::AppHandle) -> Result<Option<String>, Stri
     let folder = app.dialog().file().blocking_pick_folder();
 
     Ok(folder.map(|f| f.to_string()))
+}
+
+#[tauri::command]
+pub async fn scan_apps() -> Vec<discovery::DiscoveredApp> {
+    tokio::task::spawn_blocking(|| discovery::scan_all())
+        .await
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn set_auto_start(enabled: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let run_key = hkcu
+            .open_subkey_with_flags(
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+                KEY_WRITE,
+            )
+            .map_err(|e| format!("Failed to open Run key: {}", e))?;
+
+        if enabled {
+            let exe_path = std::env::current_exe()
+                .map_err(|e| format!("Failed to get exe path: {}", e))?;
+            run_key
+                .set_value("WorkSwitch", &exe_path.to_string_lossy().to_string())
+                .map_err(|e| format!("Failed to set registry value: {}", e))?;
+        } else {
+            // Ignore error if value doesn't exist
+            let _ = run_key.delete_value("WorkSwitch");
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

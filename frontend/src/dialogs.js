@@ -132,6 +132,7 @@ function renderStepFields(step) {
           <div class="browse-row">
             <input type="text" id="se-target" value="${escapeAttr(step.target || '')}" placeholder="C:\\path\\app.exe or spotify:">
             <button class="browse-btn" id="se-browse-file">Browse</button>
+            <button class="browse-btn" id="se-pick-app">Pick App</button>
           </div>
         </div>
         <div class="form-check">
@@ -144,6 +145,14 @@ function renderStepFields(step) {
           const path = await invoke('browse_file');
           if (path) document.getElementById('se-target').value = path;
         } catch (e) { console.error(e); }
+      });
+      document.getElementById('se-pick-app').addEventListener('click', async () => {
+        const picked = await showAppPicker();
+        if (picked) {
+          document.getElementById('se-target').value = picked.target;
+          document.getElementById('se-name').value = picked.name;
+          document.getElementById('se-process').value = picked.process_name;
+        }
       });
       break;
 
@@ -260,6 +269,10 @@ export function showSettings(settings) {
           <input type="checkbox" id="set-close-switch" ${settings.close_on_switch !== false ? 'checked' : ''}>
           <label for="set-close-switch">Offer to close apps when switching profiles</label>
         </div>
+        <div class="form-check">
+          <input type="checkbox" id="set-autostart" ${settings.auto_start_with_windows ? 'checked' : ''}>
+          <label for="set-autostart">Launch with Windows</label>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="btn-secondary" id="set-cancel">Cancel</button>
@@ -268,13 +281,21 @@ export function showSettings(settings) {
     `);
 
     document.getElementById('set-cancel').addEventListener('click', () => { hideModal(); resolve(null); });
-    document.getElementById('set-save').addEventListener('click', () => {
+    document.getElementById('set-save').addEventListener('click', async () => {
+      const autoStart = document.getElementById('set-autostart').checked;
+      // Update Windows registry for auto-start
+      try {
+        await invoke('set_auto_start', { enabled: autoStart });
+      } catch (e) {
+        console.error('Failed to set auto-start:', e);
+      }
       const result = {
         ...settings,
         launch_delay_ms: parseInt(document.getElementById('set-delay').value) || 500,
         start_minimized: document.getElementById('set-minimized').checked,
         minimize_to_tray: document.getElementById('set-tray').checked,
-        close_on_switch: document.getElementById('set-close-switch').checked
+        close_on_switch: document.getElementById('set-close-switch').checked,
+        auto_start_with_windows: autoStart
       };
       hideModal();
       resolve(result);
@@ -310,6 +331,150 @@ export function showCloseOnSwitch(processes) {
       });
       hideModal();
       resolve(toClose);
+    });
+  });
+}
+
+// ── Duplicate name prompt ──
+export function showDuplicateNamePrompt(defaultName) {
+  return new Promise((resolve) => {
+    showModal(`
+      <div class="modal-title">Duplicate Step</div>
+      <div class="form-group">
+        <label>Name for duplicate</label>
+        <input type="text" id="dup-name" value="${escapeAttr(defaultName)}" placeholder="Step name">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="dup-cancel">Cancel</button>
+        <button class="btn-primary" id="dup-ok">Duplicate</button>
+      </div>
+    `);
+
+    const input = document.getElementById('dup-name');
+    input.focus();
+    input.select();
+    document.getElementById('dup-cancel').addEventListener('click', () => { hideModal(); resolve(null); });
+    document.getElementById('dup-ok').addEventListener('click', () => {
+      const name = input.value.trim() || defaultName;
+      hideModal();
+      resolve(name);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('dup-ok').click();
+    });
+  });
+}
+
+// ── App picker ──
+function showAppPicker() {
+  return new Promise((resolve) => {
+    const content = getContent();
+
+    // Hide existing step editor children (preserves their event listeners)
+    const originalChildren = [...content.children];
+    originalChildren.forEach(ch => ch.style.display = 'none');
+
+    // Build picker wrapper and append it
+    const picker = document.createElement('div');
+    picker.id = 'app-picker-wrapper';
+    picker.innerHTML = `
+      <div class="modal-title">Pick an Application</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <input type="text" id="app-picker-search" class="app-picker-search" placeholder="Search apps...">
+      </div>
+      <div id="app-picker-body" class="app-picker-list">
+        <div class="app-picker-loading">Scanning installed apps...</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="app-picker-cancel">Cancel</button>
+      </div>
+    `;
+    content.appendChild(picker);
+
+    const closePicker = () => {
+      picker.remove();
+      originalChildren.forEach(ch => ch.style.display = '');
+    };
+
+    document.getElementById('app-picker-cancel').addEventListener('click', () => {
+      closePicker();
+      resolve(null);
+    });
+    document.getElementById('app-picker-search').focus();
+
+    // Scan apps
+    invoke('scan_apps').then((apps) => {
+      const body = document.getElementById('app-picker-body');
+      if (!body) return; // picker was closed
+
+      if (apps.length === 0) {
+        body.innerHTML = '<div class="app-picker-empty">No applications found</div>';
+        return;
+      }
+
+      // Group by source
+      const groups = {};
+      const sourceOrder = ['steam', 'epic', 'windows'];
+      const sourceLabels = { steam: 'Steam', epic: 'Epic Games', windows: 'Installed' };
+
+      for (const app of apps) {
+        if (!groups[app.source]) groups[app.source] = [];
+        groups[app.source].push(app);
+      }
+
+      const renderList = (filter) => {
+        const lowerFilter = (filter || '').toLowerCase();
+        let html = '';
+
+        for (const src of sourceOrder) {
+          const items = groups[src];
+          if (!items) continue;
+
+          const filtered = lowerFilter
+            ? items.filter(a => a.name.toLowerCase().includes(lowerFilter))
+            : items;
+
+          if (filtered.length === 0) continue;
+
+          html += '<div class="app-picker-group-header">' + escapeHtml(sourceLabels[src] || src) + '</div>';
+          for (let i = 0; i < filtered.length; i++) {
+            const a = filtered[i];
+            html += '<div class="app-picker-item" data-source="' + escapeAttr(a.source) + '" data-idx="' + escapeAttr(a.name) + '">'
+              + '<span class="app-picker-item-name">' + escapeHtml(a.name) + '</span>'
+              + '<span class="app-picker-item-badge badge-' + escapeAttr(a.source) + '">' + escapeHtml(a.source) + '</span>'
+              + '</div>';
+          }
+        }
+
+        if (!html) {
+          html = '<div class="app-picker-empty">No matching apps</div>';
+        }
+
+        body.innerHTML = html;
+
+        // Attach click handlers
+        body.querySelectorAll('.app-picker-item').forEach(el => {
+          el.addEventListener('click', () => {
+            const name = el.getAttribute('data-idx');
+            const source = el.getAttribute('data-source');
+            const app = apps.find(a => a.name === name && a.source === source);
+            if (app) {
+              closePicker();
+              resolve({ name: app.name, target: app.target, process_name: app.process_name });
+            }
+          });
+        });
+      };
+
+      renderList('');
+
+      const searchInput = document.getElementById('app-picker-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => renderList(searchInput.value));
+      }
+    }).catch(() => {
+      const body = document.getElementById('app-picker-body');
+      if (body) body.innerHTML = '<div class="app-picker-empty">Failed to scan apps</div>';
     });
   });
 }

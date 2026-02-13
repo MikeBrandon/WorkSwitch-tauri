@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod discovery;
 mod launcher;
 mod process;
 mod tray;
@@ -23,7 +24,9 @@ pub fn run() {
             commands::get_running_processes_for_steps,
             commands::browse_file,
             commands::browse_folder,
+            commands::scan_apps,
             commands::show_window,
+            commands::set_auto_start,
         ])
         .setup(|app| {
             // Create tray icon
@@ -37,6 +40,20 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
                 }
+            }
+
+            // Launch startup apps
+            if !cfg.startup_apps.is_empty() {
+                let startup_apps = cfg.startup_apps.clone();
+                std::thread::spawn(move || {
+                    for step in &startup_apps {
+                        if step.enabled {
+                            if let Err(e) = launcher::launch_step(step) {
+                                eprintln!("Startup app '{}' failed: {}", step.name, e);
+                            }
+                        }
+                    }
+                });
             }
 
             Ok(())
