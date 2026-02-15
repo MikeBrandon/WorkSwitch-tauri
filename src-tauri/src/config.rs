@@ -35,6 +35,8 @@ pub struct Settings {
     #[serde(default = "default_true")]
     pub minimize_to_tray: bool,
     #[serde(default)]
+    pub close_on_exit: bool,
+    #[serde(default)]
     pub auto_start_with_windows: bool,
 }
 
@@ -80,9 +82,12 @@ pub struct Step {
     pub check_running: Option<bool>,
     // Terminal fields
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal_app: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_dir: Option<String>,
+    // Step behavior fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep_open: Option<bool>,
 }
@@ -108,6 +113,7 @@ impl Default for AppConfig {
                 start_minimized: false,
                 close_on_switch: true,
                 minimize_to_tray: true,
+                close_on_exit: false,
                 auto_start_with_windows: false,
             },
             profiles: vec![],

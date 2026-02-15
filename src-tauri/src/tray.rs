@@ -1,4 +1,5 @@
 use crate::config::AppConfig;
+use crate::lifecycle;
 use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItemBuilder},
@@ -33,6 +34,7 @@ pub fn create_tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Err
                     let _ = window.set_focus();
                 }
             } else if id == "quit" {
+                lifecycle::close_apps_on_exit(app);
                 app.exit(0);
             } else if let Some(profile_id) = id.strip_prefix("profile-") {
                 let _ = app.emit("tray-launch-profile", profile_id.to_string());

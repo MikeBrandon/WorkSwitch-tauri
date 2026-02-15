@@ -4,7 +4,7 @@ use crate::launcher;
 use crate::process;
 use crate::tray;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 
 pub struct LaunchState {
@@ -18,6 +18,37 @@ impl Default for LaunchState {
             cancel_flag: Arc::new(AtomicBool::new(false)),
             is_running: AtomicBool::new(false),
         }
+    }
+}
+
+pub struct LastLaunch {
+    process_names: Mutex<Vec<String>>,
+}
+
+impl Default for LastLaunch {
+    fn default() -> Self {
+        LastLaunch {
+            process_names: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl LastLaunch {
+    pub fn set_processes(&self, mut names: Vec<String>) {
+        names.retain(|n| !n.trim().is_empty());
+        let mut names: Vec<String> = names
+            .into_iter()
+            .map(|n| n.trim().to_lowercase())
+            .collect();
+        names.sort();
+        names.dedup();
+        let mut guard = self.process_names.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = names;
+    }
+
+    pub fn get_processes(&self) -> Vec<String> {
+        let guard = self.process_names.lock().unwrap_or_else(|e| e.into_inner());
+        guard.clone()
     }
 }
 
@@ -222,6 +253,11 @@ pub async fn scan_apps() -> Vec<discovery::DiscoveredApp> {
     tokio::task::spawn_blocking(|| discovery::scan_all())
         .await
         .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn set_last_launch_processes(process_names: Vec<String>, state: State<'_, LastLaunch>) {
+    state.set_processes(process_names);
 }
 
 #[tauri::command]

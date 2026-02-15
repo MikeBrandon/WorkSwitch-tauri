@@ -5,6 +5,7 @@ import { startLaunch, cancelLaunch, isLaunching } from './launcher.js';
 import { showSettings, showCloseOnSwitch, showLaunchHistory } from './dialogs.js';
 import { showStartupPanel } from './startup.js';
 import { toggleProcessPanel } from './processes.js';
+import { applyTheme } from './theme.js';
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -15,6 +16,7 @@ let _lastLaunchedProfileId = null;
 async function init() {
   try {
     const config = await loadConfig();
+    applyTheme(config.settings?.theme);
 
     renderProfiles();
     if (config.profiles.length > 0) {
@@ -83,6 +85,14 @@ async function handleLaunch() {
     }
 
     _lastLaunchedProfileId = profile.id;
+    const processNames = profile.steps
+      .filter(s => s.enabled && s.process_name && s.keep_open !== true)
+      .map(s => s.process_name);
+    try {
+      await invoke('set_last_launch_processes', { processNames });
+    } catch (e) {
+      console.error('Failed to set last launch processes:', e);
+    }
     const enabledSteps = profile.steps.filter(s => s.enabled);
     await startLaunch(profile.steps, config.settings.launch_delay_ms || 500);
     // Record in history (count enabled steps as launched; errors handled by launcher events)
@@ -96,7 +106,7 @@ async function handleLaunch() {
 async function handleCloseOnSwitch(previousProfile) {
   // Get process names from previous profile that have process_name set
   const processNames = previousProfile.steps
-    .filter(s => s.process_name && s.enabled)
+    .filter(s => s.process_name && s.enabled && s.keep_open !== true)
     .map(s => s.process_name);
 
   if (processNames.length === 0) return;
@@ -130,6 +140,7 @@ async function handleSettings() {
 
   config.settings = result;
   await saveConfig(config);
+  applyTheme(config.settings?.theme);
 }
 
 async function listenTrayEvents() {

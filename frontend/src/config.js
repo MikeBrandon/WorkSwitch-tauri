@@ -48,14 +48,14 @@ export function newStep(type = 'app') {
 
   switch (type) {
     case 'app':
-      return { ...base, target: '', check_running: true };
+      return { ...base, target: '', check_running: true, keep_open: false };
     case 'terminal':
-      return { ...base, command: '', working_dir: '', keep_open: true };
+      return { ...base, terminal_app: 'windows-terminal', command: '', working_dir: '', keep_open: true };
     case 'folder':
-      return { ...base, target: '' };
+      return { ...base, target: '', keep_open: false };
     case 'url':
-      return { ...base, target: '' };
+      return { ...base, target: '', keep_open: false };
     default:
-      return { ...base, target: '' };
+      return { ...base, target: '', keep_open: false };
   }
 }

@@ -128,7 +128,7 @@ export function showProfileEditor(profile, isNew) {
 export function showStepEditor(step, isNew) {
   return new Promise((resolve) => {
     const typeOptions = ['app', 'terminal', 'folder', 'url']
-      .map(t => `<option value="${t}" ${step.type === t ? 'selected' : ''}>${t === 'terminal' ? 'Terminal (CMD)' : t.charAt(0).toUpperCase() + t.slice(1)}</option>`)
+      .map(t => `<option value="${t}" ${step.type === t ? 'selected' : ''}>${t === 'terminal' ? 'Terminal' : t.charAt(0).toUpperCase() + t.slice(1)}</option>`)
       .join('');
 
     showModal(`
@@ -201,6 +201,10 @@ function renderStepFields(step) {
           <input type="checkbox" id="se-check-running" ${step.check_running !== false ? 'checked' : ''}>
           <label for="se-check-running">Skip if already running</label>
         </div>
+        <div class="form-check">
+          <input type="checkbox" id="se-keep-open" ${step.keep_open === true ? 'checked' : ''}>
+          <label for="se-keep-open">Leave process running</label>
+        </div>
       `;
       document.getElementById('se-browse-file').addEventListener('click', async () => {
         try {
@@ -221,8 +225,15 @@ function renderStepFields(step) {
     case 'terminal':
       container.innerHTML = `
         <div class="form-group">
-          <label>Command</label>
-          <input type="text" id="se-command" value="${escapeAttr(step.command || '')}" placeholder="npm run dev">
+          <label>Terminal App</label>
+          <select id="se-terminal-app">
+            <option value="windows-terminal" ${step.terminal_app !== 'cmd' ? 'selected' : ''}>Windows Terminal</option>
+            <option value="cmd" ${step.terminal_app === 'cmd' ? 'selected' : ''}>Command Prompt (cmd)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Command (optional)</label>
+          <input type="text" id="se-command" value="${escapeAttr(step.command || '')}" placeholder="Leave blank to open the terminal">
         </div>
         <div class="form-group">
           <label>Working Directory</label>
@@ -233,7 +244,7 @@ function renderStepFields(step) {
         </div>
         <div class="form-check">
           <input type="checkbox" id="se-keep-open" ${step.keep_open !== false ? 'checked' : ''}>
-          <label for="se-keep-open">Keep terminal open</label>
+          <label for="se-keep-open">Leave process running</label>
         </div>
       `;
       document.getElementById('se-browse-dir').addEventListener('click', async () => {
@@ -253,6 +264,10 @@ function renderStepFields(step) {
             <button class="browse-btn" id="se-browse-folder">Browse</button>
           </div>
         </div>
+        <div class="form-check">
+          <input type="checkbox" id="se-keep-open" ${step.keep_open === true ? 'checked' : ''}>
+          <label for="se-keep-open">Leave process running</label>
+        </div>
       `;
       document.getElementById('se-browse-folder').addEventListener('click', async () => {
         try {
@@ -268,6 +283,10 @@ function renderStepFields(step) {
           <label>URL</label>
           <input type="text" id="se-target" value="${escapeAttr(step.target || '')}" placeholder="https://example.com">
         </div>
+        <div class="form-check">
+          <input type="checkbox" id="se-keep-open" ${step.keep_open === true ? 'checked' : ''}>
+          <label for="se-keep-open">Leave process running</label>
+        </div>
       `;
       break;
   }
@@ -279,22 +298,26 @@ function readStepFields(step) {
   // Clean up fields from other types
   delete step.target;
   delete step.check_running;
+  delete step.terminal_app;
   delete step.command;
   delete step.working_dir;
-  delete step.keep_open;
 
   switch (type) {
     case 'app': {
       const target = document.getElementById('se-target');
       const checkRunning = document.getElementById('se-check-running');
+      const keepOpen = document.getElementById('se-keep-open');
       step.target = target ? target.value.trim() : '';
       step.check_running = checkRunning ? checkRunning.checked : true;
+      step.keep_open = keepOpen ? keepOpen.checked : false;
       break;
     }
     case 'terminal': {
+      const terminalApp = document.getElementById('se-terminal-app');
       const command = document.getElementById('se-command');
       const workdir = document.getElementById('se-workdir');
       const keepOpen = document.getElementById('se-keep-open');
+      step.terminal_app = terminalApp ? terminalApp.value : 'windows-terminal';
       step.command = command ? command.value.trim() : '';
       step.working_dir = workdir ? workdir.value.trim() : '';
       step.keep_open = keepOpen ? keepOpen.checked : true;
@@ -303,7 +326,9 @@ function readStepFields(step) {
     case 'folder':
     case 'url': {
       const target = document.getElementById('se-target');
+      const keepOpen = document.getElementById('se-keep-open');
       step.target = target ? target.value.trim() : '';
+      step.keep_open = keepOpen ? keepOpen.checked : false;
       break;
     }
   }
@@ -319,6 +344,15 @@ export function showSettings(settings) {
           <label>Default launch delay (ms)</label>
           <input type="number" id="set-delay" value="${settings.launch_delay_ms || 500}" min="0" step="100">
         </div>
+        <div class="form-group">
+          <label>Theme</label>
+          <select id="set-theme">
+            <option value="auto" ${(settings.theme || 'dark') === 'auto' ? 'selected' : ''}>Auto (System)</option>
+            <option value="dark" ${(settings.theme || 'dark') === 'dark' ? 'selected' : ''}>Dark</option>
+            <option value="light" ${(settings.theme || 'dark') === 'light' ? 'selected' : ''}>Light</option>
+            <option value="frosted" ${(settings.theme || 'dark') === 'frosted' ? 'selected' : ''}>Frosted Glass</option>
+          </select>
+        </div>
         <div class="form-check">
           <input type="checkbox" id="set-minimized" ${settings.start_minimized ? 'checked' : ''}>
           <label for="set-minimized">Start minimized</label>
@@ -330,6 +364,10 @@ export function showSettings(settings) {
         <div class="form-check">
           <input type="checkbox" id="set-close-switch" ${settings.close_on_switch !== false ? 'checked' : ''}>
           <label for="set-close-switch">Offer to close apps when switching profiles</label>
+        </div>
+        <div class="form-check">
+          <input type="checkbox" id="set-close-exit" ${settings.close_on_exit ? 'checked' : ''}>
+          <label for="set-close-exit">Close launched apps when exiting WorkSwitch</label>
         </div>
         <div class="form-check">
           <input type="checkbox" id="set-autostart" ${settings.auto_start_with_windows ? 'checked' : ''}>
@@ -354,9 +392,11 @@ export function showSettings(settings) {
       const result = {
         ...settings,
         launch_delay_ms: parseInt(document.getElementById('set-delay').value) || 500,
+        theme: document.getElementById('set-theme').value,
         start_minimized: document.getElementById('set-minimized').checked,
         minimize_to_tray: document.getElementById('set-tray').checked,
         close_on_switch: document.getElementById('set-close-switch').checked,
+        close_on_exit: document.getElementById('set-close-exit').checked,
         auto_start_with_windows: autoStart
       };
       hideModal();

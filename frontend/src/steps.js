@@ -23,7 +23,9 @@ export function renderSteps() {
     card.className = 'step-card' + (step.enabled ? '' : ' disabled');
     card.dataset.stepId = step.id;
 
-    const badgeLabel = step.type === 'terminal' ? 'CMD' : step.type.toUpperCase();
+    const badgeLabel = step.type === 'terminal'
+      ? (step.terminal_app === 'cmd' ? 'CMD' : 'WT')
+      : step.type.toUpperCase();
     const detail = getStepDetail(step);
 
     card.innerHTML = `
@@ -101,7 +103,12 @@ export function renderSteps() {
 function getStepDetail(step) {
   switch (step.type) {
     case 'app': return step.target || '';
-    case 'terminal': return step.command || '';
+    case 'terminal': {
+      const defaultLabel = step.terminal_app === 'cmd'
+        ? 'Open Command Prompt'
+        : 'Open Windows Terminal';
+      return step.command || defaultLabel;
+    }
     case 'folder': return step.target || '';
     case 'url': return step.target || '';
     default: return '';
