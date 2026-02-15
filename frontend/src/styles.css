@@ -808,6 +808,8 @@ body {
 .badge-steam { background: #1b2838; color: #66c0f4; }
 .badge-epic { background: #2a2a2a; color: #fff; }
 .badge-windows { background: var(--accent-dim); color: #93b5f0; }
+.badge-macos { background: #333; color: #ccc; }
+.badge-linux { background: #2d2d2d; color: #f0c674; }
 
 .app-picker-loading,
 .app-picker-empty {

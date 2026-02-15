@@ -198,12 +198,24 @@ pub async fn get_running_processes_for_steps(process_names: Vec<String>) -> Vec<
 pub async fn browse_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
-    let file = app
-        .dialog()
-        .file()
-        .add_filter("Executables", &["exe", "bat", "cmd", "lnk"])
-        .add_filter("All Files", &["*"])
-        .blocking_pick_file();
+    let mut dialog = app.dialog().file();
+
+    #[cfg(target_os = "windows")]
+    {
+        dialog = dialog.add_filter("Executables", &["exe", "bat", "cmd", "lnk"]);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        dialog = dialog.add_filter("Applications", &["app", "sh", "command"]);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        dialog = dialog.add_filter("Executables", &["sh", "desktop", "AppImage"]);
+    }
+
+    let file = dialog.add_filter("All Files", &["*"]).blocking_pick_file();
 
     Ok(file.map(|f| f.to_string()))
 }
@@ -246,8 +258,76 @@ pub fn set_auto_start(enabled: bool) -> Result<(), String> {
                 .set_value("WorkSwitch", &exe_path.to_string_lossy().to_string())
                 .map_err(|e| format!("Failed to set registry value: {}", e))?;
         } else {
-            // Ignore error if value doesn't exist
             let _ = run_key.delete_value("WorkSwitch");
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir()
+            .ok_or_else(|| "Could not find home directory".to_string())?;
+        let plist_path = home.join("Library/LaunchAgents/com.workswitch.app.plist");
+
+        if enabled {
+            let exe_path = std::env::current_exe()
+                .map_err(|e| format!("Failed to get exe path: {}", e))?;
+
+            let plist_content = format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.workswitch.app</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>"#,
+                exe_path.display()
+            );
+
+            // Ensure LaunchAgents directory exists
+            if let Some(parent) = plist_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+
+            std::fs::write(&plist_path, plist_content)
+                .map_err(|e| format!("Failed to write LaunchAgent plist: {}", e))?;
+        } else {
+            let _ = std::fs::remove_file(&plist_path);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = dirs::home_dir()
+            .ok_or_else(|| "Could not find home directory".to_string())?;
+        let autostart_dir = home.join(".config/autostart");
+        let desktop_path = autostart_dir.join("workswitch.desktop");
+
+        if enabled {
+            let exe_path = std::env::current_exe()
+                .map_err(|e| format!("Failed to get exe path: {}", e))?;
+
+            let desktop_content = format!(
+                "[Desktop Entry]\n\
+                 Type=Application\n\
+                 Name=WorkSwitch\n\
+                 Exec={}\n\
+                 X-GNOME-Autostart-enabled=true\n\
+                 Hidden=false\n",
+                exe_path.display()
+            );
+
+            let _ = std::fs::create_dir_all(&autostart_dir);
+            std::fs::write(&desktop_path, desktop_content)
+                .map_err(|e| format!("Failed to write autostart desktop file: {}", e))?;
+        } else {
+            let _ = std::fs::remove_file(&desktop_path);
         }
     }
 

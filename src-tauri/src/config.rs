@@ -118,7 +118,11 @@ impl Default for AppConfig {
 }
 
 pub fn config_path() -> PathBuf {
-    // Look next to the executable first, then fall back to current dir
+    // On Windows: next to the executable (existing behavior)
+    // On macOS: ~/Library/Application Support/com.workswitch.app/config.json
+    // On Linux: ~/.config/workswitch/config.json
+
+    // First check for existing config next to exe or in dev mode root (all platforms)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let p = dir.join("config.json");
@@ -138,11 +142,38 @@ pub fn config_path() -> PathBuf {
             }
         }
     }
-    // Fall back to exe directory for new configs
-    std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(|p| p.join("config.json")))
-        .unwrap_or_else(|| PathBuf::from("config.json"))
+
+    // Platform-specific default path for new configs
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: next to exe
+        std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().map(|p| p.join("config.json")))
+            .unwrap_or_else(|| PathBuf::from("config.json"))
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(dir) = dirs::config_dir() {
+            let app_dir = dir.join("com.workswitch.app");
+            let _ = fs::create_dir_all(&app_dir);
+            app_dir.join("config.json")
+        } else {
+            PathBuf::from("config.json")
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(dir) = dirs::config_dir() {
+            let app_dir = dir.join("workswitch");
+            let _ = fs::create_dir_all(&app_dir);
+            app_dir.join("config.json")
+        } else {
+            PathBuf::from("config.json")
+        }
+    }
 }
 
 pub fn load_config() -> AppConfig {

@@ -515,8 +515,8 @@ function showAppPicker() {
 
       // Group by source
       const groups = {};
-      const sourceOrder = ['steam', 'epic', 'windows'];
-      const sourceLabels = { steam: 'Steam', epic: 'Epic Games', windows: 'Installed' };
+      const sourceOrder = ['steam', 'epic', 'windows', 'macos', 'linux'];
+      const sourceLabels = { steam: 'Steam', epic: 'Epic Games', windows: 'Installed', macos: 'Applications', linux: 'Installed' };
 
       for (const app of apps) {
         if (!groups[app.source]) groups[app.source] = [];
