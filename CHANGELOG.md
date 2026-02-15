@@ -12,8 +12,12 @@ All notable changes to this project will be documented in this file.
 - Close-on-exit option to terminate last-launched processes.
 - Windows app discovery for Steam, Epic Games, and installed apps.
 - `LastLaunch` state and command to track last-launched processes.
+- Kill & Wipe workflow with a toolbar action, selectable options, and optional immediate mode.
+- Desktop shortcut creation for Kill & Wipe with startup flags (`--kill-and-wipe`, `--kill-and-wipe-immediate`).
+- Post-logout greeting message after Kill & Wipe completes.
 
 ### Changed
 - Terminal steps now display `WT`/`CMD` badges and show default labels when no command is provided.
 - Close-on-switch ignores steps marked to keep running.
 - Titlebar and overlay now use theme-aware colors.
+- Kill & Wipe runs Windows-first process cleanup, temp clearing, browser data wiping, DNS flush, and optional logout.

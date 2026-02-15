@@ -1,6 +1,7 @@
 mod commands;
 mod config;
 mod discovery;
+mod kill_wipe;
 mod launcher;
 mod lifecycle;
 mod process;
@@ -17,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(LaunchState::default())
         .manage(commands::LastLaunch::default())
+        .manage(commands::StartupFlags::from_args())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
@@ -37,6 +39,9 @@ pub fn run() {
             commands::import_profile,
             commands::save_profile_file,
             commands::load_profile_file,
+            commands::get_startup_flags,
+            commands::kill_and_wipe,
+            commands::create_kill_and_wipe_shortcut,
         ])
         .setup(|app| {
             // Create tray icon

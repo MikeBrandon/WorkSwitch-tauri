@@ -251,6 +251,15 @@ body {
   color: var(--text-primary);
 }
 
+.toolbar-btn.danger {
+  color: var(--danger);
+}
+
+.toolbar-btn.danger:hover {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--danger-hover);
+}
+
 /* === Main Layout === */
 #main {
   display: flex;
@@ -772,6 +781,16 @@ body {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
+}
+
+.warning-box {
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  margin-bottom: 12px;
 }
 
 .btn-primary {

@@ -29,6 +29,20 @@ export function showConfirm(title, message) {
   });
 }
 
+// -- Info dialog --
+export function showInfo(title, message) {
+  return new Promise((resolve) => {
+    showModal(`
+      <div class="modal-title">${escapeHtml(title)}</div>
+      <p style="color: var(--text-secondary); margin-bottom: 12px;">${escapeHtml(message || '')}</p>
+      <div class="modal-actions">
+        <button class="btn-primary" id="info-ok">OK</button>
+      </div>
+    `);
+    document.getElementById('info-ok').addEventListener('click', () => { hideModal(); resolve(true); });
+  });
+}
+
 // ── Profile editor ──
 export function showProfileEditor(profile, isNew) {
   return new Promise((resolve) => {
@@ -398,6 +412,70 @@ export function showSettings(settings) {
         close_on_switch: document.getElementById('set-close-switch').checked,
         close_on_exit: document.getElementById('set-close-exit').checked,
         auto_start_with_windows: autoStart
+      };
+      hideModal();
+      resolve(result);
+    });
+  });
+}
+
+// -- Kill & Wipe dialog --
+export function showKillAndWipe(settings) {
+  return new Promise((resolve) => {
+    const s = settings || {};
+
+    showModal(`
+      <div class="modal-title">Kill &amp; Wipe</div>
+      <div class="warning-box">
+        This is destructive. It can close apps, delete cache, wipe browser data, and log you out.
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="kw-kill" ${s.kill_processes !== false ? 'checked' : ''}>
+        <label for="kw-kill">Kill running processes (excluding critical system ones)</label>
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="kw-temp" ${s.clear_temp !== false ? 'checked' : ''}>
+        <label for="kw-temp">Clear %TEMP% and Windows Temp</label>
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="kw-browsers" ${s.clear_browsers !== false ? 'checked' : ''}>
+        <label for="kw-browsers">Wipe browser cache, cookies, and history</label>
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="kw-dns" ${s.flush_dns !== false ? 'checked' : ''}>
+        <label for="kw-dns">Flush DNS cache</label>
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="kw-logout" ${s.logout !== false ? 'checked' : ''}>
+        <label for="kw-logout">Log out after completion</label>
+      </div>
+      <div class="form-check" style="margin-top:10px">
+        <input type="checkbox" id="kw-confirm" ${s.confirm_before !== false ? 'checked' : ''}>
+        <label for="kw-confirm">Show this dialog before running</label>
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="kw-shortcut">
+        <label for="kw-shortcut">Create desktop shortcut for Kill &amp; Wipe</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="kw-cancel">Cancel</button>
+        <button class="btn-danger" id="kw-run">Run</button>
+      </div>
+    `);
+
+    document.getElementById('kw-cancel').addEventListener('click', () => { hideModal(); resolve(null); });
+    document.getElementById('kw-run').addEventListener('click', () => {
+      const result = {
+        settings: {
+          ...s,
+          kill_processes: document.getElementById('kw-kill').checked,
+          clear_temp: document.getElementById('kw-temp').checked,
+          clear_browsers: document.getElementById('kw-browsers').checked,
+          flush_dns: document.getElementById('kw-dns').checked,
+          logout: document.getElementById('kw-logout').checked,
+          confirm_before: document.getElementById('kw-confirm').checked
+        },
+        create_shortcut: document.getElementById('kw-shortcut').checked
       };
       hideModal();
       resolve(result);

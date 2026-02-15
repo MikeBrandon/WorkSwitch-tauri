@@ -38,6 +38,26 @@ pub struct Settings {
     pub close_on_exit: bool,
     #[serde(default)]
     pub auto_start_with_windows: bool,
+    #[serde(default = "default_kill_wipe")]
+    pub kill_wipe: KillWipeSettings,
+    #[serde(default)]
+    pub post_logout_message_pending: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KillWipeSettings {
+    #[serde(default = "default_true")]
+    pub confirm_before: bool,
+    #[serde(default = "default_true")]
+    pub kill_processes: bool,
+    #[serde(default = "default_true")]
+    pub clear_temp: bool,
+    #[serde(default = "default_true")]
+    pub clear_browsers: bool,
+    #[serde(default = "default_true")]
+    pub flush_dns: bool,
+    #[serde(default = "default_true")]
+    pub logout: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +124,17 @@ fn default_true() -> bool {
     true
 }
 
+fn default_kill_wipe() -> KillWipeSettings {
+    KillWipeSettings {
+        confirm_before: true,
+        kill_processes: true,
+        clear_temp: true,
+        clear_browsers: true,
+        flush_dns: true,
+        logout: true,
+    }
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         AppConfig {
@@ -115,6 +146,8 @@ impl Default for AppConfig {
                 minimize_to_tray: true,
                 close_on_exit: false,
                 auto_start_with_windows: false,
+                kill_wipe: default_kill_wipe(),
+                post_logout_message_pending: false,
             },
             profiles: vec![],
             startup_apps: vec![],
