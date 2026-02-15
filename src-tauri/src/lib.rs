@@ -1,7 +1,9 @@
 mod commands;
 mod config;
 mod discovery;
+mod kill_wipe;
 mod launcher;
+mod lifecycle;
 mod process;
 mod scheduler;
 mod tray;
@@ -15,6 +17,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .manage(LaunchState::default())
+        .manage(commands::LastLaunch::default())
+        .manage(commands::StartupFlags::from_args())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
@@ -26,6 +30,7 @@ pub fn run() {
             commands::browse_file,
             commands::browse_folder,
             commands::scan_apps,
+            commands::set_last_launch_processes,
             commands::show_window,
             commands::set_auto_start,
             commands::browse_save_profile,
@@ -34,6 +39,9 @@ pub fn run() {
             commands::import_profile,
             commands::save_profile_file,
             commands::load_profile_file,
+            commands::get_startup_flags,
+            commands::kill_and_wipe,
+            commands::create_kill_and_wipe_shortcut,
         ])
         .setup(|app| {
             // Create tray icon
@@ -74,13 +82,15 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 // Check minimize_to_tray setting
-                let cfg = config::load_config();
-                if cfg.settings.minimize_to_tray {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
+            let cfg = config::load_config();
+            if cfg.settings.minimize_to_tray {
+                api.prevent_close();
+                let _ = window.hide();
+                return;
             }
-        })
+            lifecycle::close_apps_on_exit(&window.app_handle());
+        }
+    })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

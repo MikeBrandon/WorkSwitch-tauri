@@ -25,8 +25,12 @@ function buildStartupHTML() {
     stepsHtml = '<div class="empty-state" style="padding:24px 0"><span class="empty-state-icon">&#9889;</span><span>No startup apps</span></div>';
   } else {
     stepsHtml = apps.map((step, index) => {
-      const badgeLabel = step.type === 'terminal' ? 'CMD' : step.type.toUpperCase();
-      const detail = step.target || step.command || '';
+      const badgeLabel = step.type === 'terminal'
+        ? (step.terminal_app === 'cmd' ? 'CMD' : 'WT')
+        : step.type.toUpperCase();
+      const detail = step.type === 'terminal'
+        ? (step.command || (step.terminal_app === 'cmd' ? 'Open Command Prompt' : 'Open Windows Terminal'))
+        : (step.target || step.command || '');
       return `
         <div class="step-card startup-step-card ${step.enabled ? '' : 'disabled'}" data-index="${index}">
           <input type="checkbox" class="step-checkbox startup-toggle" ${step.enabled ? 'checked' : ''} data-index="${index}">

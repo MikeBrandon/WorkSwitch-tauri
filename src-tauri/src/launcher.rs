@@ -86,10 +86,7 @@ fn launch_via_start(target: &str) -> Result<(), String> {
 }
 
 fn launch_terminal(step: &Step) -> Result<(), String> {
-    let command = step.command.as_deref().unwrap_or("");
-    if command.is_empty() {
-        return Err("No command specified".to_string());
-    }
+    let command = step.command.as_deref().unwrap_or("").trim();
 
     let working_dir = step
         .working_dir
@@ -98,20 +95,47 @@ fn launch_terminal(step: &Step) -> Result<(), String> {
         .unwrap_or_default();
 
     let keep_open = step.keep_open.unwrap_or(true);
+    let terminal_app = step
+        .terminal_app
+        .as_deref()
+        .unwrap_or("windows-terminal")
+        .to_lowercase();
 
     #[cfg(target_os = "windows")]
     {
-        let flag = if keep_open { "/K" } else { "/C" };
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", "start", "cmd", flag, command]);
+        if terminal_app == "cmd" || terminal_app == "command-prompt" {
+            let mut cmd = Command::new("cmd");
 
-        if !working_dir.is_empty() {
-            cmd.current_dir(&working_dir);
+            if command.is_empty() {
+                cmd.args(["/C", "start", "cmd"]);
+            } else {
+                let flag = if keep_open { "/K" } else { "/C" };
+                cmd.args(["/C", "start", "cmd", flag, command]);
+            }
+
+            if !working_dir.is_empty() {
+                cmd.current_dir(&working_dir);
+            }
+
+            cmd.creation_flags(CREATE_NO_WINDOW)
+                .spawn()
+                .map_err(|e| format!("Failed to launch Command Prompt: {}", e))?;
+        } else {
+            let mut cmd = Command::new("wt");
+
+            if !working_dir.is_empty() {
+                cmd.args(["-d", &working_dir]);
+            }
+
+            if !command.is_empty() {
+                let flag = if keep_open { "/K" } else { "/C" };
+                cmd.args(["cmd", flag, command]);
+            }
+
+            cmd.creation_flags(CREATE_NO_WINDOW)
+                .spawn()
+                .map_err(|e| format!("Failed to launch Windows Terminal: {}", e))?;
         }
-
-        cmd.creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| format!("Failed to launch terminal: {}", e))?;
     }
 
     Ok(())

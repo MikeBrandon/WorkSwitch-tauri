@@ -2,9 +2,10 @@ import { loadConfig, getConfig, saveConfig } from './config.js';
 import { renderProfiles, selectProfile, addProfile, getSelectedProfile, getSelectedProfileId, importProfile } from './profiles.js';
 import { renderSteps, addStep } from './steps.js';
 import { startLaunch, cancelLaunch, isLaunching } from './launcher.js';
-import { showSettings, showCloseOnSwitch, showLaunchHistory } from './dialogs.js';
+import { showSettings, showCloseOnSwitch, showLaunchHistory, showKillAndWipe, showInfo } from './dialogs.js';
 import { showStartupPanel } from './startup.js';
 import { toggleProcessPanel } from './processes.js';
+import { applyTheme } from './theme.js';
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -15,6 +16,7 @@ let _lastLaunchedProfileId = null;
 async function init() {
   try {
     const config = await loadConfig();
+    applyTheme(config.settings?.theme);
 
     renderProfiles();
     if (config.profiles.length > 0) {
@@ -22,6 +24,8 @@ async function init() {
     }
 
     wireEvents();
+    await maybeShowPostLogoutMessage();
+    await handleStartupFlags();
     await listenTrayEvents();
   } catch (err) {
     console.error('Init error:', err);
@@ -63,6 +67,12 @@ function wireEvents() {
   // Import profile
   document.getElementById('btn-import-profile').addEventListener('click', importProfile);
 
+  // Kill & Wipe
+  const killBtn = document.getElementById('btn-kill-wipe');
+  if (killBtn) {
+    killBtn.addEventListener('click', () => handleKillAndWipe(false));
+  }
+
   // Global hotkeys
   registerHotkeys();
 }
@@ -83,6 +93,14 @@ async function handleLaunch() {
     }
 
     _lastLaunchedProfileId = profile.id;
+    const processNames = profile.steps
+      .filter(s => s.enabled && s.process_name && s.keep_open !== true)
+      .map(s => s.process_name);
+    try {
+      await invoke('set_last_launch_processes', { processNames });
+    } catch (e) {
+      console.error('Failed to set last launch processes:', e);
+    }
     const enabledSteps = profile.steps.filter(s => s.enabled);
     await startLaunch(profile.steps, config.settings.launch_delay_ms || 500);
     // Record in history (count enabled steps as launched; errors handled by launcher events)
@@ -96,7 +114,7 @@ async function handleLaunch() {
 async function handleCloseOnSwitch(previousProfile) {
   // Get process names from previous profile that have process_name set
   const processNames = previousProfile.steps
-    .filter(s => s.process_name && s.enabled)
+    .filter(s => s.process_name && s.enabled && s.keep_open !== true)
     .map(s => s.process_name);
 
   if (processNames.length === 0) return;
@@ -130,6 +148,107 @@ async function handleSettings() {
 
   config.settings = result;
   await saveConfig(config);
+  applyTheme(config.settings?.theme);
+}
+
+async function handleKillAndWipe(immediateOverride) {
+  const config = getConfig();
+  if (!config) return;
+
+  const killWipe = normalizeKillWipeSettings(config.settings?.kill_wipe);
+  const runImmediate = immediateOverride === true || killWipe.confirm_before === false;
+
+  if (!runImmediate) {
+    const result = await showKillAndWipe(killWipe);
+    if (!result) return;
+    config.settings.kill_wipe = result.settings;
+    await saveConfig(config);
+
+    if (result.create_shortcut) {
+      try {
+        await invoke('create_kill_and_wipe_shortcut', { immediate: result.settings.confirm_before === false });
+      } catch (e) {
+        console.error('Shortcut creation failed:', e);
+      }
+    }
+
+    await runKillAndWipe(result.settings);
+    return;
+  }
+
+  await runKillAndWipe(killWipe);
+}
+
+async function runKillAndWipe(settings) {
+  const status = document.getElementById('status-text');
+  if (status) status.textContent = 'Kill & Wipe in progress...';
+
+  const options = {
+    kill_processes: settings.kill_processes !== false,
+    clear_temp: settings.clear_temp !== false,
+    clear_browsers: settings.clear_browsers !== false,
+    flush_dns: settings.flush_dns !== false,
+    logout: settings.logout !== false
+  };
+
+  try {
+    const report = await invoke('kill_and_wipe', { options });
+    if (options.logout) {
+      if (status) status.textContent = 'Logging out...';
+      return;
+    }
+
+    const summary = [
+      `Killed processes: ${report.killed_count}`,
+      `Browser clears: ${report.browser_cleared.length > 0 ? report.browser_cleared.join(', ') : 'None'}`,
+      `DNS flushed: ${report.dns_flushed ? 'Yes' : 'No'}`
+    ].join(' | ');
+
+    const warningCount = (report.kill_failures?.length || 0)
+      + (report.temp_failures?.length || 0)
+      + (report.browser_failures?.length || 0)
+      + (options.flush_dns && !report.dns_flushed ? 1 : 0);
+
+    if (status) {
+      status.textContent = warningCount > 0 ? `${summary} | Warnings: ${warningCount}` : summary;
+    }
+  } catch (e) {
+    console.error('Kill & Wipe failed:', e);
+    if (status) status.textContent = 'Kill & Wipe failed. Check logs.';
+  }
+}
+
+function normalizeKillWipeSettings(settings) {
+  const base = {
+    confirm_before: true,
+    kill_processes: true,
+    clear_temp: true,
+    clear_browsers: true,
+    flush_dns: true,
+    logout: true
+  };
+  return { ...base, ...(settings || {}) };
+}
+
+async function maybeShowPostLogoutMessage() {
+  const config = getConfig();
+  if (!config?.settings?.post_logout_message_pending) return;
+
+  await showInfo('Cleanup Complete', 'We cleaned up everything while you pannicked!');
+  config.settings.post_logout_message_pending = false;
+  await saveConfig(config);
+}
+
+async function handleStartupFlags() {
+  try {
+    const flags = await invoke('get_startup_flags');
+    if (!flags?.kill_and_wipe) return;
+    setTimeout(() => {
+      handleKillAndWipe(flags.kill_and_wipe_immediate);
+    }, 150);
+  } catch (e) {
+    console.error('Startup flags error:', e);
+  }
 }
 
 async function listenTrayEvents() {

@@ -2,10 +2,12 @@ use crate::config::{self, AppConfig, Profile, Step};
 use crate::discovery;
 use crate::launcher;
 use crate::process;
+use crate::kill_wipe;
 use crate::tray;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
+use serde::Serialize;
 
 pub struct LaunchState {
     pub cancel_flag: Arc<AtomicBool>,
@@ -18,6 +20,75 @@ impl Default for LaunchState {
             cancel_flag: Arc::new(AtomicBool::new(false)),
             is_running: AtomicBool::new(false),
         }
+    }
+}
+
+pub struct LastLaunch {
+    process_names: Mutex<Vec<String>>,
+}
+
+impl Default for LastLaunch {
+    fn default() -> Self {
+        LastLaunch {
+            process_names: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl LastLaunch {
+    pub fn set_processes(&self, mut names: Vec<String>) {
+        names.retain(|n| !n.trim().is_empty());
+        let mut names: Vec<String> = names
+            .into_iter()
+            .map(|n| n.trim().to_lowercase())
+            .collect();
+        names.sort();
+        names.dedup();
+        let mut guard = self.process_names.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = names;
+    }
+
+    pub fn get_processes(&self) -> Vec<String> {
+        let guard = self.process_names.lock().unwrap_or_else(|e| e.into_inner());
+        guard.clone()
+    }
+}
+
+#[derive(Clone)]
+pub struct StartupFlags {
+    kill_and_wipe: bool,
+    kill_and_wipe_immediate: bool,
+}
+
+impl StartupFlags {
+    pub fn from_args() -> Self {
+        let mut flags = StartupFlags {
+            kill_and_wipe: false,
+            kill_and_wipe_immediate: false,
+        };
+        for arg in std::env::args() {
+            if arg == "--kill-and-wipe" {
+                flags.kill_and_wipe = true;
+            } else if arg == "--kill-and-wipe-immediate" {
+                flags.kill_and_wipe = true;
+                flags.kill_and_wipe_immediate = true;
+            }
+        }
+        flags
+    }
+}
+
+#[derive(Serialize)]
+pub struct StartupFlagsResponse {
+    pub kill_and_wipe: bool,
+    pub kill_and_wipe_immediate: bool,
+}
+
+#[tauri::command]
+pub fn get_startup_flags(state: State<'_, StartupFlags>) -> StartupFlagsResponse {
+    StartupFlagsResponse {
+        kill_and_wipe: state.kill_and_wipe,
+        kill_and_wipe_immediate: state.kill_and_wipe_immediate,
     }
 }
 
@@ -225,6 +296,11 @@ pub async fn scan_apps() -> Vec<discovery::DiscoveredApp> {
 }
 
 #[tauri::command]
+pub fn set_last_launch_processes(process_names: Vec<String>, state: State<'_, LastLaunch>) {
+    state.set_processes(process_names);
+}
+
+#[tauri::command]
 pub fn set_auto_start(enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -321,4 +397,28 @@ pub fn show_window(app: tauri::AppHandle) -> Result<(), String> {
         let _ = window.set_focus();
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn kill_and_wipe(
+    options: kill_wipe::KillWipeOptions,
+) -> Result<kill_wipe::KillWipeReport, String> {
+    let logout = options.logout;
+    let report = tokio::task::spawn_blocking(move || kill_wipe::run(&options))
+        .await
+        .map_err(|e| format!("Kill & Wipe task failed: {}", e))?;
+
+    if logout {
+        let mut cfg = config::load_config();
+        cfg.settings.post_logout_message_pending = true;
+        let _ = config::save_config(&cfg);
+        kill_wipe::request_logout();
+    }
+
+    Ok(report)
+}
+
+#[tauri::command]
+pub fn create_kill_and_wipe_shortcut(immediate: bool) -> Result<(), String> {
+    kill_wipe::create_desktop_shortcut(immediate)
 }
